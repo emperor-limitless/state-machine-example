@@ -1,0 +1,181 @@
+/*MIT License
+
+Copyright (c) 2024 emperor-limitless
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+funcdef void pause_handler();
+
+funcdef void dialog_callback(audio_game@);
+
+// A dialog button.
+// this could allow you to have a dialog with text and different actions to choose from, commonly found in rpg's.
+
+class dialog_button {
+    string label;
+    dialog_callback@ on_pressed;
+    dialog_button(string label, dialog_callback@ on_pressed) {
+        this.label = label;
+        @this.on_pressed = on_pressed;
+    }
+    void press(audio_game@ game) {
+        if (on_pressed != null) {
+            on_pressed(game);
+        }
+    }
+}
+
+// A dialog class that could take text to speak or a sound to play, until the user presses enter.
+class dialog : state {
+    string[] message;
+    string file_name;    // file_name is used for dialogs that have a sound, it fades once the user presses enter for example, of course it is possible to have a text and sound dialog at the same time.
+    dialog_callback@ on_close;
+    dialog_button@[] buttons(0);
+    sound dialog_sound;
+    string open_sound;    // open, click and close are typically for text dialogs. However they can be used for audio dialogs, if you have a logo dialog for example.
+    string close_sound;
+    string click_sound;
+    uint index = 0; // indexing the array of message which could be multiline.
+    int button_index = -1; // for moving through buttons
+    bool looped = false; // whether the dialog sound loops or plays once.
+    dialog(audio_game@ game, string message = "", string file_name = "", dialog_callback@ on_close = null, string open_sound = "ui/dialog/open.ogg", string close_sound = "ui/dialog/close.ogg", string click_sound = "ui/dialog/click.ogg", bool looped = false) {
+        super(game);
+        this.message = message.split("\n"); // allows you to make a multiline dialog, just construct a multiline string literal.
+        this.file_name = file_name;
+        @this.on_close = on_close;
+        this.open_sound = open_sound;
+        this.close_sound = close_sound;
+        this.click_sound = click_sound;
+        this.looped = looped;
+    }
+    void pause_music() {
+        if (file_name.is_empty()) {
+            return;
+        }
+        int amount = -50;
+        dialog_sound.slide_volume(amount, 8000);
+        while (true) {
+            if (dialog_sound.volume <= amount) {
+                dialog_sound.close();
+                break;
+            }
+        }
+    }
+    void close() {
+        if (!close_sound.is_empty()) {
+            game.pool.play_stationary(close_sound, false);
+        }
+        if (!file_name.is_empty() && dialog_sound.playing) {
+            //dialog_sound.slide_volume(-30, 10000);
+            async<void>(pause_handler(pause_music));
+        }
+        if (on_close != null) {
+            on_close(game);
+        } else {
+            game.states.pop();
+        }
+    }
+    void next() {
+        if (message.is_empty() || button_index < 0 && index >= message.length() -1) {
+            close();
+            return;
+        }
+        if (button_index < 0) {
+            game.pool.play_stationary(click_sound, false);
+            index++;
+            speak(message[index], true);
+        } else {
+            buttons[button_index].press(game);
+        }
+    }
+    void speak_button() {
+        if (buttons.is_empty() || button_index < 0) {
+            return;
+        }
+        speak(buttons[button_index].label, true);
+    }
+    void add_button(string label, dialog_callback@ callback) {
+        dialog_button button(label, callback);
+        buttons.insert_last(button);
+    }
+    void speak_message() {
+        if (!message.is_empty()) {
+            speak(message[index], true);
+        }
+    }
+    void on_append() {
+        if (!open_sound.is_empty()) {
+            game.pool.play_stationary(open_sound, false);
+        }
+        if (!file_name.is_empty()) {
+            dialog_sound.load(file_name);
+            if (looped) {
+                dialog_sound.play_looped();
+            } else {
+                dialog_sound.play();
+            }
+        }
+        if (!message.is_empty()) {
+            speak(message[index], true);
+        }
+    }
+    void on_update() {
+        state::on_update();
+        if (!file_name.is_empty()) {
+            if (!dialog_sound.playing && (message.is_empty() || buttons.is_empty())) {
+                close();
+                return;
+            }
+        }
+        if (key_pressed(KEY_RETURN)) {
+            next();
+        }
+        else if (key_pressed(KEY_LEFT) || key_pressed(KEY_RIGHT)) {
+            if (button_index < 0) {
+                speak_message();
+            } else {
+                speak_button();
+            }
+        }
+        else if (key_pressed(KEY_DOWN)) {
+            if (buttons.is_empty()) {
+                speak_message();
+            }
+            else if (!buttons.is_empty() && button_index < buttons.length() - 1) {
+                button_index++;
+                speak_button();
+            }
+        }
+        else if (key_pressed(KEY_UP)) {
+            if (button_index < 0) {
+                speak_message();
+            } else {
+                if (!buttons.is_empty() && button_index > -1) {
+                    button_index--;
+                    if (button_index < 0) {
+                        speak_message();
+                    } else {
+                        speak_button();
+                    }
+                }
+            }
+        }
+    }
+}

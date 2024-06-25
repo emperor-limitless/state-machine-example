@@ -1,0 +1,99 @@
+/*MIT License
+
+Copyright (c) 2024 emperor-limitless
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+class state {
+    audio_game@ game;
+    state@[] stack;
+    state(audio_game@ game) {
+        @this.game = game;
+    }
+    void replace(state@ replaceable, int remove_amount = 1) {
+        if (!stack.is_empty()) {
+            pop(remove_amount);
+        }
+        append(replaceable);
+    }
+    void append(state@ new_state) {
+        if (!stack.is_empty()) {
+            get_last().on_unfocus();
+        }
+        new_state.on_append();
+        stack.insert_last(new_state);
+    }
+    void pop(int remove_amount = 1) {
+        if (remove_amount <= 0 || stack.is_empty()) {
+            return;  // nothing to remove
+        }
+        int end_index = stack.length() - remove_amount;
+        if (end_index < 0) {
+            end_index = 0;  // ensure we don't go out of bounds
+        }
+        for (uint i = stack.length() - 1; i >= end_index; i--) {
+            stack[i].on_pop();
+            stack.remove_at(i);
+        }
+        if (!stack.is_empty()) {
+            get_last().on_focus();
+        }
+    }
+
+    void on_focus() {
+        if (stack.is_empty()) {
+            return;
+        }
+        state@ last = get_last();
+        for (uint i = 0; i < last.stack.length(); i++) {
+            last.stack[i].on_focus();
+        }
+    }
+    void on_unfocus() {
+        if (stack.is_empty()) {
+            return;
+        }
+        state@ last = get_last();
+        for (uint i = 0; i < last.stack.length(); i++) {
+            last.stack[i].on_unfocus();
+        }
+    }
+    void on_pop() {
+        if (stack.is_empty()) {
+            return;
+        }
+        state@ last = get_last();
+        for (uint i = 0; i < last.stack.length(); i++) {
+            last.stack[i].on_pop();
+        }
+    }
+    void on_append() {}
+    void on_update() {
+        if (!stack.is_empty()) {
+            get_last().on_update();
+        }
+    }
+    state@ get_last() {
+        if (!stack.is_empty()) {
+            return stack[stack.length() -1];
+        }
+        return null;
+    }
+}

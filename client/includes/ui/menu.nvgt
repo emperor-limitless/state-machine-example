@@ -1,0 +1,133 @@
+/*MIT License
+
+Copyright (c) 2024 emperor-limitless
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+#include "speech.nvgt"
+#include "../game.nvgt"
+#include "../states.nvgt"
+
+funcdef void menu_callback(audio_game@, int, string);
+
+funcdef void menu_close_callback(audio_game@);
+
+class menu_item {
+    string title;
+    menu_callback@ callback;
+    menu_item(string t, menu_callback@ cb) {
+        title = t;
+        @callback = cb;
+    }
+}
+class menu : state {
+    menu_item@[] items;
+    int index = -1;
+    string title;
+    string open_sound;
+    string close_sound;
+    string move_sound;
+    string select_sound;
+    string music;
+    sound music_handle;
+    menu_close_callback@ on_close;
+    menu(audio_game@ game, string title = "", string close_sound = "menu/main/close.ogg", string open_sound = "menu/main/open.ogg", string move_sound = "menu/main/move.ogg", string select_sound = "menu/main/select.ogg", string music = "", menu_close_callback@ on_close = null) {
+        super(game);
+        this.title = title;
+        @this.on_close = on_close;
+        this.open_sound = open_sound;
+        this.close_sound = close_sound;
+        this.move_sound = move_sound;
+        this.select_sound = select_sound;
+        this.music = music;
+    }
+    void pause_music(double duration) {
+        if (music.is_empty()) {
+            return;
+        }
+        music_handle.slide_volume(-50, duration);
+        println(duration);
+        while (true) {
+            if (music_handle.volume <= -50) {
+                music_handle.stop();
+                break;
+            }
+        }
+    }
+    void add(string title, menu_callback@ callback) {
+        menu_item item(title, callback);
+        items.insert_last(item);
+    }
+    void on_append() {
+        game.pool.play_stationary(open_sound, false);
+        if (!music.is_empty()) {
+            music_handle.load(music);
+            music_handle.play_looped();
+        }
+        speak(title);
+    }
+    void on_unfocus() {
+        state::on_unfocus();
+        if (!music.is_empty()) {
+            music_handle.slide_volume(-50, 5500);
+        }
+    }
+    void on_focus() {
+        state::on_focus();
+        if (!music.is_empty()) {
+            music_handle.slide_volume(0, 0);
+            music_handle.stop();
+            music_handle.play_looped();
+        }
+    }
+    void on_pop() {
+        state::on_pop();
+        if (!music.is_empty()) {
+            music_handle.close();
+        }
+    }
+    void on_update() {
+        state::on_update();
+        if (key_pressed(KEY_ESCAPE)) {
+            if (on_close != null) {
+                on_close(game);
+            } else {
+                game.states.pop();
+            }
+        }
+        if (!items.is_empty()) {
+            if (key_pressed(KEY_RETURN) && index >= 0) {
+                game.pool.play_stationary(select_sound, false);
+                items[index].callback(game, index, items[index].title);
+            }
+
+            if (key_repeating(KEY_DOWN)) {
+                index = (index + 1) % items.length();
+                speak(items[index].title, true);
+                game.pool.play_stationary(move_sound, false);
+            }
+            else if (key_repeating(KEY_UP)) {
+                index = (index < 0 ? items.length() -1 : (index - 1 + items.length()) % items.length());
+                speak(items[index].title, true);
+                game.pool.play_stationary(move_sound, false);
+            }
+        }
+    }
+}

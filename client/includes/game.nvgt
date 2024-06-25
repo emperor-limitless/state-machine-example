@@ -1,0 +1,61 @@
+/*MIT License
+
+Copyright (c) 2024 emperor-limitless
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+#include "form.nvgt"
+#include "sound_pool.nvgt"
+#include "states.nvgt"
+
+class audio_game {
+    string title;
+    sound_pool pool;
+    bool running = true;
+    state states(this);
+    audio_game(string title, string sound_location = "", string sound_key = "") {
+        show_window(title);
+        if (!sound_location.is_empty()) {
+            pack pk;
+            if (pk.open(sound_location, PACK_OPEN_MODE_READ)) {
+                @sound_default_pack = pk;
+            }
+        }
+        if (!sound_key.is_empty()) {
+            //not yet ready but here just in case it gets added soon.
+            //set_sound_decryption_key(sound_key);
+        }
+    }
+    void run() {
+        while (running) {
+            wait(5);
+            // if the states are empty we close the program.
+            if (states.stack.is_empty()) {
+                running = false;
+                break;
+            }
+            states.on_update();
+            if ((key_down(KEY_LALT) || key_down(KEY_RALT)) && key_pressed(KEY_F4)) {
+                running = false;
+                break;
+            }
+        }
+    }
+}
