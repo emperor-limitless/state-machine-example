@@ -21,6 +21,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#include "../game.nvgt"
+#include "../states.nvgt"
+
 funcdef void pause_handler();
 
 funcdef void dialog_callback(audio_game@);
