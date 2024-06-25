@@ -32,9 +32,9 @@ funcdef void menu_close_callback(audio_game@);
 class menu_item {
     string title;
     menu_callback@ callback;
-    menu_item(string t, menu_callback@ cb) {
-        title = t;
-        @callback = cb;
+    menu_item(string title, menu_callback@ callback) {
+        this.title = title;
+        @this.callback = callback;
     }
 }
 class menu : state {
